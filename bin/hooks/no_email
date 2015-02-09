@@ -1,0 +1,8 @@
+#!/bin/bash
+
+. /usr/local/Reductor/etc/const
+
+main() {
+	show_msg "$msg"
+	$BINDIR/menu
+}

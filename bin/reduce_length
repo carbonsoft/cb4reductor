@@ -1,0 +1,17 @@
+#!/usr/local/bin/python2.7
+
+__author__ = 'oleg'
+
+import sys
+from re import sub
+
+def reduce_url(url):
+    if len(url) > 300:
+        return reduce_url(url[:url.rfind('/')])
+    return url
+
+for url in sys.stdin.readlines():
+    result = reduce_url(url)
+    if not result.endswith('\n'):
+        result += '\n'
+    sys.stdout.write(result)

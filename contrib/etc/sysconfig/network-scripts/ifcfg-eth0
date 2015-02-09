@@ -1,0 +1,13 @@
+DEVICE="eth0"
+BOOTPROTO=none
+DNS1="8.8.8.8"
+GATEWAY="введите_здесь_ваш_шлюз"
+IPADDR="введите_здесь_ip_для_управления"
+NETMASK="введите_сетевую_маску"
+NM_CONTROLLED="no"
+ONBOOT="yes"
+TYPE="Ethernet"
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=yes
+IPV6INIT=no
+NAME="System eth0"

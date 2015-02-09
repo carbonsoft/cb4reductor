@@ -1,0 +1,62 @@
+#!/usr/local/bin/python2.7
+# -*- coding: utf-8 -*-
+
+import xml.etree.ElementTree as etree
+import sys
+
+__author__ = 'oleg'
+
+
+def url_is_domain(url):
+    s = url.split("/")
+    if url.endswith("/"):
+        del s[-1]
+    if len(s) < 4:
+        return True
+    return False
+
+https_list = []
+
+def process_elem(elem, print_list):
+    url_list = []
+    ip_list = []
+    full_domain = https_trigger = 0
+    print("\n# id " + elem.attrib['id'])
+    for attrs in elem._children:
+        if attrs.tag not in print_list:
+            continue
+        data = attrs.text.encode('utf-8')
+        if attrs.tag == 'url' and full_domain == 0:
+            if data.startswith("https"):
+                https_trigger = 1
+                domain = data.split('/')[2]
+                if not (domain in https_list):
+                    https_list.append(domain)
+                data = data.replace("https", "http", 1)
+            if not data.startswith("http"):
+                data = 'http://' + data
+            if not (data in url_list):
+                url_list.append(data)
+            if url_is_domain(data):
+                url_list = [data]
+                full_domain = 1
+        if attrs.tag == 'ip':
+            if data not in ip_list and https_trigger == 1:
+                ip_list.append(data)
+
+    for url in url_list:
+        print "add_url " + url
+    for ip in ip_list:
+        print "add_ip " + ip
+
+
+dump = "dump.xml"
+if len(sys.argv) == 2:
+    dump = sys.argv[1]
+for elem in etree.parse(dump).getroot()._children:
+    process_elem(elem, "ip" "domain" "url")
+
+print
+print "# https domains to resolv"
+for domain in https_list:
+    print "need_resolv " + domain

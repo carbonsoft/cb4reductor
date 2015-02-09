@@ -1,0 +1,7 @@
+#!/bin/bash
+
+. /usr/local/reductor/etc/const
+
+[ "$1" != 'auto' ] && clear
+$OPENSSL x509 -noout -dates -in $PRIVATE_KEY
+[ "$1" != 'auto' ] && read -p "Нажмите enter чтобы продолжить" tmp

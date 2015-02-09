@@ -1,0 +1,37 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          reductor
+# Required-Start:    
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:	 0 6
+# Short-Description: insert kernel module and create firewall rules
+### END INIT INFO
+
+PATH=/sbin:/bin
+
+. /etc/init.d/functions
+. /usr/local/Reductor/etc/const
+
+case "$1" in
+	start)
+		/usr/local/Reductor/bin/start.sh
+		echo
+		;;
+	restart)
+		/usr/local/Reductor/bin/stop.sh 
+		/usr/local/Reductor/bin/start.sh
+		echo
+		;;
+	stop)
+		/usr/local/Reductor/bin/stop.sh 
+		echo
+		;;
+	status)
+		get_reductor_state
+		;;
+	*)
+		echo "Usage: $0 start|stop|restart|status" >&2
+		exit 3
+		;;
+esac

@@ -1,0 +1,1 @@
+/usr/local/reductor/bin/stop.sh

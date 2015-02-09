@@ -1,0 +1,14 @@
+#!/usr/local/bin/python2.7
+
+__author__ = 'oleg'
+
+import sys
+from re import sub
+
+for url in sys.stdin.readlines():
+    try:
+        host = url.split('/')[2].strip()
+        new_host = host.decode('koi8-r').lower().encode('idna')
+        sys.stdout.write(sub("(?i)" + host, new_host, url))
+    except Exception:
+        sys.stderr.write('cant lower host/escape url, skip: ' + url)

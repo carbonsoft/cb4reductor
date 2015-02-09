@@ -1,0 +1,261 @@
+#!/bin/bash
+
+MAINDIR=/usr/local/reductor
+RWDIR=/var/lib/reductor/
+CACHEDIR=${RWDIR}/cache/
+BINDIR=${MAINDIR}/bin
+USERDIR=${RWDIR}/userinfo
+HOOKDIR=${USERDIR}/hooks
+CONTRIB=${MAINDIR}/contrib
+CONFIG=/etc/ics/ics.conf
+MENULIB=${MAINDIR}/usr/share/menu_lib
+PRIVATE_KEY=${USERDIR}/provider.pem
+CHROOTDIR=${MAINDIR}/reductor_container
+MODULES=${CHROOTDIR}/lib/modules
+SSLDIR=${CHROOTDIR}/gost-ssl
+SSLSSLDIR=${SSLDIR}/ssl
+SSLPRIVATEDIR=${SSLDIR}/ssl
+OPENSSL=${CHROOTDIR}/gost-ssl/bin/openssl
+LISTDIR=${RWDIR}/lists
+PROCLIST=/proc/net/ipt_reductor/block_list
+LOGDIR=/var/log/reductor
+LOGFILE=$LOGDIR/reductor.log
+NETWORK_SCRIPTS=/etc/sysconfig/network-scripts
+TMPDIR=/tmp/reductor/
+BASE64="openssl enc -base64"
+
+REPO_HOST="download5.carbonsoft.ru"
+GOTO_SUPPORT="обратитесь в техподдержку по адресу http://helpdesk.carbonsoft.ru"
+NETWORK_SETUP_LINK="Информация о том, как настроить зеркало трафика самостоятельно имеется в статье: http://docs.carbonsoft.ru/pages/viewpage.action?pageId=48398419"
+NO_CONNECTION="Не могу связаться с сервером сигнатур! Проверьте работу сети."
+
+check_reg="Проверка регистрационных данных: "
+reg="Система регистрации: "
+updater="Скрипт обновления списков запрещённых сайтов: "
+wrong_email="К этому регномеру привязан другой email! Если вы сменили email - $GOTO_SUPPORT"
+wrong_company="Этот регномер использует другая компания! Если произошло переименование компании, $GOTO_SUPPORT"
+wrong_install_number="Этот регномер привязан к другой машине! Если произошла замена сервера, $GOTO_SUPPORT"
+wrong_regnumber="Ошибка системы автоматической регистрации! Обязательно $GOTO_SUPPORT"
+bad_email="Указан неверный email, проверьте правильность ввода!"
+no_email="Не указан email! Заполните все настройки обновления списков в следующем меню!"
+no_regnumber="Не указан регномер! Попробовать автоматически получить его?"
+no_installcode="Не указан код установки, скорее всего модуль не загружен в ядро, выполните /etc/init.d/reductor restart, в случае если это не поможет $GOTO_SUPPORT"
+ip_regex="([0-9]{1,3}\.){3}[0-9]{1,3}"
+
+get_reductor_instcode() {
+	[ ! -f /proc/net/ipt_reductor/block_list ] && echo "No proc entry, bad" >&2 && return 0
+	read tmp tmp num < /proc/net/ipt_reductor/block_list
+	echo $num
+}
+
+get_version() {
+	cat /etc/version
+}
+
+set_reductor_regnum() {
+        cfg_fname=/etc/ics/ics.conf
+        mount -o rw,remount /mnt/bk_disc
+        {
+                while IFS= read -r line; do
+                        [[ "$line" = "RED_REG_REGNUMBER"* ]] && continue
+                        echo "$line"
+                done < "$cfg_fname"
+                echo "RED_REG_REGNUMBER='$1'"
+        } > /tmp/cfg1
+        cat /tmp/cfg1 > "$cfg_fname"
+        rm -f /tmp/cfg1
+        sync
+}
+
+update_variable() {
+        cfg_fname=/etc/ics/ics.conf
+        mount -o rw,remount /mnt/bk_disc
+        {
+                while IFS= read -r line; do
+                        [[ "$line" = "$1"* ]] && continue
+                        echo "$line"
+                done < "$cfg_fname"
+                echo "$1='$2'"
+ 	} > /tmp/cfg1
+        cat /tmp/cfg1 > "$cfg_fname"
+        rm -f /tmp/cfg1
+        sync
+}
+
+show_msg() {
+	if ! which dialog &>/dev/null || [ "$TERM" = 'dump' ] ; then
+		echo "$@"
+	else
+		dialog --msgbox "$@" 0 0
+	fi
+}
+
+show_menu_with_msg() {
+	show_msg "$@"
+	$BINDIR/menu
+}
+
+show_msg_and_run() {
+	run="$1"
+	shift
+	show_msg "$@"
+	$run
+}
+
+warning() {
+	log WARNING $@ >&2
+}
+
+get_reductor_state() {
+	local stringstate
+	[ ! -f /proc/net/ipt_reductor/block_list ] && echo "Модуль не загружен" && return 0
+	state="$(fgrep statement: /proc/net/ipt_reductor/block_list | sed -e 's/[^0-9]//g')"
+	[ "$state" = '0' ] && stringstate="Не активирован"
+	[ "$state" = '1' ] && stringstate="Активирован"
+	echo "$stringstate"
+	log "$stringstate" >> $LOGDIR/reductor_state.log
+}
+
+ask() {
+	dialog --yesno "$@" 0 0
+}
+
+ask_custom() {
+	export DIALOG_LABEL_YES="$1"
+	export DIALOG_LABEL_NO="$2"
+        shift; shift 
+        question="$@"
+	dialog --yesno "$question" 10 50
+}
+
+show_file() {
+	if [ "$TERM" = 'dump' -o "${auto:-0}" = '1' ]; then
+		cat $1
+	else
+		dialog --textbox "$1" 0 0
+	fi
+}
+
+die() {
+	show_msg "$@"
+	exit 0
+}
+
+dialog_read() {
+	dialog --stdout --inputbox "$@" 0 0
+}
+
+check_connect() {
+	ping -c 1 "docs.carbonsoft.ru" &>/dev/null
+}
+
+check_connect_repo() {
+	ping -c 1 $REPO_HOST &>/dev/null
+}
+
+
+is_module_loaded() {
+	[ -f $PROCLIST ]
+}
+
+terminate() {
+	show_msg "$@"
+	exit 1
+}
+
+terminate_auto() {
+	echo "$@" >&2
+	exit 1
+}
+
+__terminate() {
+	[ "$auto" = '1' ] && terminate_auto "$@" || terminate "$@"
+}
+
+log() {
+        echo "$(date +"%Y-%m-%d %H:%M:%S") $HOSTNAME ${0##*/}[$$]: $@"
+}
+
+create_message() {
+	if [ "$1" = 'support2admin' ]; then
+		echo "From: feedback.reductor@carbonsoft.ru
+To: ${autoupdate[email]}
+Content-Type: text/plain; charset = \"KOI8-R\"
+Subject: Проблема с Carbon Reductor"
+		shift
+	fi
+
+	if [ "$1" = 'admin2support' ]; then
+		echo "From: ${autoupdate[email]}
+To: feedback.reductor@carbonsoft.ru
+Content-Type: text/plain; charset = \"KOI8-R\"
+Subject: Проблема с Carbon Reductor"
+		shift
+	fi
+
+	date +"%Y-%m-%d %H:%M:%S"
+	echo "Состояние активации:"
+	get_reductor_state
+	echo -n "Версия: "
+	get_version
+	echo "Information: "
+	set | grep autoupdate | tr '[' '\n' | egrep -v "(widget|exportkey|autoupdate|reductorupdate|misc|.*}.*)" | tr -d ']'
+	echo
+	echo "Сообщение:"
+	cat $1
+	echo
+	ip a
+	echo
+	echo "Настройка отправки этих писем находится в локальном меню сервера: "
+	echo "- menu -> Прочие настройки... -> Слать отчёт об ошибках разработчикам"
+	echo "- menu -> Прочие настройки... -> Слать отчёт об ошибках администратору"
+}
+
+sendmail() {
+	/usr/bin/msmtp --host=smtp.carbonsoft.ru --port=25251 --connect-timeout=10 $@
+}
+
+#usage: send_alarm /tmp/message.txt
+send_alarm() {
+	feedback="feedback.reductor@carbonsoft.ru"
+	if [ "${misc['diagnostic2support']}" = '1' ]; then
+		create_message admin2support "$1" | sendmail -f "${autoupdate[email]}" -t $feedback
+	fi
+	if [ "${misc['diagnostic2admin']}" = '1' ]; then
+		for mail in ${autoupdate['email']} ${misc['admin_email']}; do
+			create_message support2admin "$1" | sendmail -f $feedback -t $mail
+		done
+		# todo: 23.06.2014 первая мысль о том что надо удалить
+		# create_message support2admin "$1" | sendmail -f $feedback -t "${autoupdate[email]}"
+	fi
+}
+
+set_consoletype_serial() {
+	CONSOLETYPE=serial
+	BOOTUP=serial
+	MOVE_TO_COL=
+	SETCOLOR_SUCCESS=
+	SETCOLOR_FAILURE=
+	SETCOLOR_WARNING=
+	SETCOLOR_NORMAL=
+}
+
+echo_result() {
+	[ "${1:-$?}" = '0' ] && echo_success || echo_failure
+	echo
+}
+
+get_reg_params() {
+	echo "regnumber=${RED_REG_REGNUMBER:-}&installcode=$(get_reductor_instcode)&actcode=${RED_REG_ACTCODE:-}&email=${RED_AUTOUPDATE_EMAIL:-}&company=${REG_AUTOUPDATE_USERNAME// /%20}&version=$(get_version)"
+}
+
+__exit() {
+	RETVAL=$?
+	if [ "$RETVAL" != 0 ]; then
+		echo -n "ERROR($RETVAL): $0 "
+		for ((i=${#FUNCNAME[@]}; i>0; i--)); do
+			echo -n "${FUNCNAME[$i-1]} "
+		done | sed -e 's/ $/\n/; s/ / -> /g'
+	fi
+	return $RETVAL
+}

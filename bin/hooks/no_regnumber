@@ -1,0 +1,7 @@
+#!/bin/bash
+
+. /usr/local/Reductor/etc/const
+
+main() {
+	ask "$msg" && $BINDIR/reg_main.sh
+}

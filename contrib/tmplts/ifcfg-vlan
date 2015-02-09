@@ -1,0 +1,8 @@
+VLAN=yes
+DEVICE=$eth.$tag
+BOOTPROTO=static
+BRIDGE=$bridge
+IPADDR=$ip
+NETMASK=255.255.255.0
+TYPE=Ethernet
+ONBOOT=yes
