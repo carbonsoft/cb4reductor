@@ -16,6 +16,7 @@ function __encode($line) {
 	$url = str_replace("%29", ")", $url);
 	$url = str_replace("%40", "@", $url);
 	$url = str_replace("%2B", "+", $url);
+	$url = str_replace("%3B", ";", $url);
 	return "$url";
 }
 
