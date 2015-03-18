@@ -4,19 +4,20 @@ $data = file("/tmp/reductor/http.load");
 
 function __encode($line) {
 	$url = urlencode($line);
-	$url = str_replace("%2F", "/", $url);
-	$url = str_replace("%3A", ":", $url);
-	$url = str_replace("%3F", "?", $url);
-	$url = str_replace("%3D", "=", $url);
-	$url = str_replace("%26", "&", $url);
-	$url = str_replace("%2C", ",", $url);
 	$url = str_replace("%23", "#", $url);
-	$url = str_replace("%7E", "~", $url);
+	$url = str_replace("%26", "&", $url);
 	$url = str_replace("%28", "(", $url);
 	$url = str_replace("%29", ")", $url);
-	$url = str_replace("%40", "@", $url);
+	$url = str_replace("%2C", ",", $url);
+	$url = str_replace("%2F", "/", $url);
+	$url = str_replace("%2A", "*", $url);
 	$url = str_replace("%2B", "+", $url);
+	$url = str_replace("%3A", ":", $url);
 	$url = str_replace("%3B", ";", $url);
+	$url = str_replace("%3D", "=", $url);
+	$url = str_replace("%3F", "?", $url);
+	$url = str_replace("%40", "@", $url);
+	$url = str_replace("%7E", "~", $url);
 	return "$url";
 }
 
